@@ -83,7 +83,6 @@ universal; building it and cutting a release are below.
 
 ```sh
 Scripts/build-xcframework.sh                        # -> build/RMMarks.xcframework
-Scripts/build-xcframework.sh ../some-app/Frameworks # and install it there too
 ```
 
 `Package.swift` is the real project; `project.yml` beside it declares the same

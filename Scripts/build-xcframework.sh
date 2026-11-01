@@ -8,11 +8,9 @@
 # it once per platform, wrap the frameworks.
 #
 #   Scripts/build-xcframework.sh                 # -> build/RMMarks.xcframework
-#   Scripts/build-xcframework.sh ../some-app/Frameworks
-#                                                # and install it there too
+#   Scripts/build-xcframework.sh <directory>     # and install it there too
 #
-# The second form is how a consuming application gets a new codec: the path
-# names a directory, and `RMMarks.xcframework` inside it is replaced.
+# With a directory, `RMMarks.xcframework` inside it is replaced.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
