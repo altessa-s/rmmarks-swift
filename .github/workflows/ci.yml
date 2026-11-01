@@ -1,0 +1,90 @@
+# What has to be true of every push and every pull request.
+#
+# The thresholds are the reason this file exists. Every threshold in
+# `MarkedText` — how far past the middle of a line a band may sit, how much of
+# a word it has to cover to take it — is pinned by tests built from concrete
+# marked pages. They are the tests that stop being true quietly: a threshold
+# nudged by a tenth still compiles, still reads as though someone meant it,
+# and still passes anything that checks the shape of the answer rather than
+# the answer. Only the pages say otherwise, so they run on every push.
+#
+# The gathering of passages into blocks is the standing example. Taking the
+# first block a passage reaches instead of every block it reaches is wrong
+# only when three marks overlap in a particular order — and then it hands
+# back two blocks lying over one corner of the page. A suite that does not
+# ask that question cannot catch it.
+#
+# macOS, and here it is worth being exact about why, because the usual reason
+# does not apply: this package imports nothing at all, not even Foundation,
+# and its tests would run wherever Swift does. What pins the runner is that
+# `Package.swift` declares `.macOS(.v15)` and that the framework job needs
+# `xcodebuild`, which is Apple's. The Xcode is chosen rather than pinned —
+# `Package.swift` asks for tools 6.3, and a runner image pinned to an older
+# Xcode fails to parse the manifest at all, with an error that reads like a
+# syntax error and is not one.
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+# Least privilege, named rather than inherited: these jobs read the tree and
+# write nothing, and the default token would let them do more.
+permissions:
+  contents: read
+
+# Actions are pinned to a major tag: patches and security fixes arrive without
+# a commit here, and a major bump — which is the one that can break a build —
+# still has to be made on purpose. A repository that wants the stricter form
+# pins the full commit SHA instead, and then needs something like Dependabot to
+# move it.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Use the newest Xcode on the runner
+        run: Scripts/ci-select-xcode.sh
+      - run: swift build --build-tests
+      - run: swift test
+
+  lint:
+    name: SwiftLint
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      # A release pinned by number rather than whatever Homebrew has today:
+      # `--strict` below turns every new rule a new SwiftLint ships into a red
+      # build, and a build that goes red without a commit is a build nobody
+      # can bisect. Bumping the number is a commit, reviewed like one.
+      - name: Install SwiftLint 0.65.1
+        run: |
+          curl -sSL -o swiftlint.zip \
+            https://github.com/realm/SwiftLint/releases/download/0.65.1/portable_swiftlint.zip
+          unzip -q swiftlint.zip -d swiftlint-bin
+      # `--strict` because the configuration beside it has no warnings left to
+      # tolerate: every rule that fires on deliberate work is switched off by
+      # name, with the reason given beside it. A warning here is new.
+      - run: swiftlint-bin/swiftlint lint --strict
+
+  framework:
+    name: Build the xcframework
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Use the newest Xcode on the runner
+        run: Scripts/ci-select-xcode.sh
+      - run: brew install xcodegen
+      # The artefact a consumer links against, built the way a release is:
+      # the script's own checks refuse a static framework and one missing a
+      # slice, and both are failures that otherwise surface only in the
+      # consumer.
+      - run: Scripts/build-xcframework.sh
